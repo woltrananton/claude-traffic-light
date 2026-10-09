@@ -27,11 +27,17 @@ dot belongs to which terminal:
 - **Left-click a dot** to bring that session's window to the front (restored if minimized).
   - With the VS Code extension, it also switches to the **exact terminal tab** the session runs in,
     even when several Claude sessions share the same VS Code window.
-  - For **background agents** (started from Claude Code's agent view or with `claude --bg`), it opens
-    a `claude attach` tab for that agent in the editor area, next to the terminal you started it
-    from. The tab is reused on the next click and closes itself when you detach (Ctrl+Z).
+  - For **background agents** (started from Claude Code's agent view or with `claude --bg`), it brings
+    up the terminal running agent view, as it is: if it shows the agent list, you pick the agent there.
+    Use **Open in its own tab** in the right-click menu to go straight to the agent instead. If the
+    agent view terminal has been closed, a click opens the agent's own tab.
+  - A **conversation you open from agent view or `/resume`** continues as a background copy, but
+    it keeps its dot and label, and a click goes to the terminal showing it.
 - **Right-click a dot** for a menu:
   - **Close dot** — hides that dot. It comes back (with the same label) if the session becomes active again.
+  - **Open in its own tab** — background agents only; opens a `claude attach` tab for the agent in the
+    editor area. The tab is reused next time and closes itself when you detach (Ctrl+Z). If agent
+    view was showing the agent, it goes back to the agent list, since only one view can show it.
   - **Stop agent** — background agents only; runs `claude stop`. The conversation is kept, so
     `claude attach` can reopen it.
   - **Reset (clear all sessions)** — removes all dots.
@@ -209,7 +215,7 @@ Files are written atomically (write to `.tmp`, then rename), so the tray app nev
 | `UserPromptSubmit`, `PreToolUse` | Yellow |
 | `Notification` | Red — except idle notifications ("Claude is waiting for your input"), which keep the current status |
 | `Stop` | Green |
-| `SessionEnd` | The state file is deleted and the dot disappears |
+| `SessionEnd` | The state file is moved to `~/.claude/trafficlight/.ended/` (kept for a day) and the dot disappears |
 
 ### Labels
 
@@ -252,13 +258,14 @@ started the agents.
 2. It brings the window to the front. For VS Code, which runs every window in one process, it picks
    the window whose title contains the session's workspace name, as reported by the extension, and
    falls back to matching the project folder name.
-   A conversation you `/resume` in a terminal may continue as a background session that the terminal
-   only displays. Claude Code doesn't record which terminal that is, but the terminal's Claude process
-   gets a `parkedJobId` in `~/.claude/sessions/<pid>.json`. If exactly one such terminal has the same
-   project folder, the click goes to that terminal instead of opening a new tab.
+   A conversation you open from agent view or `/resume` in a terminal continues as a background copy
+   with a new session id, which the terminal then displays. The terminal's Claude process gets
+   `parkedJobId` = the copy's short id in `~/.claude/sessions/<pid>.json`, so a click on the copy goes
+   to that terminal instead of opening a new tab. `hook.sh` uses the same link to give the copy the
+   label of the terminal's dot.
 3. The VS Code extension in every window watches the focus file. Only the window that owns the
    terminal reacts: it shows that terminal tab, or opens or reuses a `claude attach` tab for a
-   background agent.
+   background agent (from the menu, or when its agent view terminal is closed).
 
 ## Limitations
 
@@ -268,10 +275,12 @@ started the agents.
 - **Two VS Code windows with the same folder open** can't be told apart. The most recently used one wins.
 - **The Claude Code VS Code panel** (chat view) isn't supported for tab switching — only Claude
   running in VS Code's integrated terminal.
-- **Switching agents inside agent view** isn't possible from outside Claude Code, so background
-  agents open in their own `claude attach` tab instead.
-- Background agent tabs open in the window where Claude Code's daemon was first started from, which
-  is usually the first terminal you started agents in.
+- **Switching agents inside agent view** isn't possible from outside Claude Code, and Claude Code
+  doesn't record which agent a terminal's agent view is showing (not in its files, logs or terminal
+  title). So a click brings up agent view as it is, and opening an agent in its own tab takes it over
+  from an agent view that was showing it.
+- A background agent's agent view terminal is the one Claude Code's daemon was first started from,
+  which is usually the first terminal you started agents in.
 
 ## Troubleshooting
 

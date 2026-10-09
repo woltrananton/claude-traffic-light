@@ -2,7 +2,7 @@
   "name": "claude-traffic-light-focus",
   "displayName": "Claude Traffic Light – terminal focus",
   "description": "Shows the right terminal tab when you click a Claude dot in the taskbar.",
-  "version": "0.4.1",
+  "version": "0.5.1",
   "publisher": "woltrananton",
   "repository": { "type": "git", "url": "https://github.com/woltrananton/claude-traffic-light" },
   "license": "MIT",

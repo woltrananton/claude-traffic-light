@@ -233,6 +233,13 @@ function New-SessionMenu([string]$id, [string]$label, [bool]$background) {
     $hideItem.Tag = $id
     $hideItem.add_Click({ param($sender, $e) Hide-Session $sender.Tag })
     if ($background) {
+        $tabItem = $m.Items.Add("Open $label in its own tab")
+        $tabItem.Tag = $id
+        $tabItem.add_Click({
+            param($sender, $e)
+            $x = $trays[$sender.Tag]
+            if ($x) { Show-SessionWindow $x.Hwnd $x.Cwd $x.TermPid $x.AttachId $x.Label -OwnTab }
+        })
         $stopItem = $m.Items.Add("Stop agent $label")
         $stopItem.Tag = $id
         $stopItem.add_Click({ param($sender, $e) Stop-Agent $sender.Tag })
@@ -294,34 +301,44 @@ function Request-TerminalFocus([int]$termPid, [string]$sessionId, [string]$label
     try { [System.IO.File]::WriteAllText($focusFile, $text) } catch {}
 }
 
-# When you run /resume in a terminal, Claude Code can start the conversation as a background session
-# that the terminal then displays. The link isn't visible in the process tree, but the terminal's claude
-# process gets "parkedJobId" in ~/.claude/sessions/<pid>.json. If exactly one such terminal has the same
-# project folder as the background session, it is assumed to be the one showing the session.
+# When you open a terminal's own conversation from agent view, or /resume one, Claude Code continues it
+# as a background copy that the terminal then displays. The link isn't visible in the process tree, but
+# the terminal's claude process gets "parkedJobId" = the copy's short id in ~/.claude/sessions/<pid>.json.
 $sessionsDir = Join-Path $env:USERPROFILE '.claude\sessions'
-function Resolve-ResumedTerminal([int]$claudePid) {
-    try { $bg = Get-Content -LiteralPath (Join-Path $sessionsDir "$claudePid.json") -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
-    $candidates = @()
+function Resolve-ParkedTerminal([string]$sessionId) {
+    $shortId = $sessionId.Substring(0, [Math]::Min(8, $sessionId.Length))
+    $terminalPid = 0
     foreach ($f in Get-ChildItem -Path $sessionsDir -Filter *.json -ErrorAction SilentlyContinue) {
         try { $s = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
-        if ($s.kind -ne 'interactive' -or -not $s.parkedJobId -or $s.cwd -ne $bg.cwd) { continue }
+        if ($s.kind -ne 'interactive' -or $s.parkedJobId -ne $shortId) { continue }
         if (-not (Get-Process -Id ([int]$s.pid) -ErrorAction SilentlyContinue)) { continue }
-        $candidates += [int]$s.pid
+        $terminalPid = [int]$s.pid
+        break
     }
-    if ($candidates.Count -ne 1) { return $null }
+    if ($terminalPid -eq 0) { return $null }
     # Same lookup that hook.sh does, but starting from the terminal's claude process
-    $found = & (Join-Path $PSScriptRoot 'find-window.ps1') $candidates[0] | Select-Object -Last 1
+    $found = & (Join-Path $PSScriptRoot 'find-window.ps1') $terminalPid | Select-Object -Last 1
     $parts = "$found" -split ' '
     if ($parts.Count -lt 2 -or [int]$parts[1] -eq 0) { return $null }
     return @{ Hwnd = [long]$parts[0]; TermPid = [int]$parts[1] }
 }
 
-# Brings up the session's window (terminal / VS Code) when the dot is clicked
-function Show-SessionWindow([long]$hwnd, [string]$cwd, [int]$termPid, [string]$sessionId, [string]$label, [int]$claudePid) {
-    # Background session with no known terminal (after /resume): show the terminal displaying it instead of a new tab
-    if ($sessionId -and $termPid -eq 0 -and $claudePid -ne 0) {
-        $r = Resolve-ResumedTerminal $claudePid
+# True if Claude Code still runs in this terminal shell, i.e. its agent view is still there
+function Test-ClaudeInShell([int]$shellPid) {
+    return [bool](Get-CimInstance Win32_Process -Filter "ParentProcessId = $shellPid AND Name = 'claude.exe'" -ErrorAction SilentlyContinue)
+}
+
+# Brings up the session's window (terminal / VS Code) when the dot is clicked.
+# -OwnTab (from the right-click menu) opens a background agent in its own "claude attach" tab.
+function Show-SessionWindow([long]$hwnd, [string]$cwd, [int]$termPid, [string]$sessionId, [string]$label, [switch]$OwnTab) {
+    if ($sessionId -and -not $OwnTab) {
+        # Background copy of a terminal's conversation: show the terminal that displays it.
+        # Other background agent: show the terminal running agent view. Claude Code doesn't say which
+        # agent agent view is showing, and an attach tab would take the agent over from it, so the tab
+        # is only opened when that terminal is gone (or from the menu).
+        $r = Resolve-ParkedTerminal $sessionId
         if ($r) { $hwnd = $r.Hwnd; $termPid = $r.TermPid; $sessionId = '' }
+        elseif ($termPid -ne 0 -and (Test-ClaudeInShell $termPid)) { $sessionId = '' }
     }
     Request-TerminalFocus $termPid $sessionId $label
     if ($hwnd -eq 0) { return }
@@ -389,7 +406,7 @@ $timer.add_Tick({
             $t.add_MouseClick({
                 param($sender, $e)
                 if ($e.Button -ne [System.Windows.Forms.MouseButtons]::Left) { return }
-                foreach ($x in $trays.Values) { if ($x.Tray -eq $sender) { Show-SessionWindow $x.Hwnd $x.Cwd $x.TermPid $x.AttachId $x.Label $x.ClaudePid } }
+                foreach ($x in $trays.Values) { if ($x.Tray -eq $sender) { Show-SessionWindow $x.Hwnd $x.Cwd $x.TermPid $x.AttachId $x.Label } }
             })
             $trays[$s.Id] = $entry
         }
@@ -398,7 +415,6 @@ $timer.add_Tick({
         $entry.Cwd = $s.Cwd
         $entry.TermPid = $s.TermPid
         $entry.AttachId = if ($s.Background) { $s.Id } else { '' }
-        $entry.ClaudePid = $s.ClaudePid
         $entry.Label = $letter
         $menuKey = "$letter|$($s.Background)"
         if ($entry.MenuKey -ne $menuKey) {

@@ -20,8 +20,16 @@ session=$(printf '%s' "$input" | sed -n 's/.*"session_id" *: *"\([^"]*\)".*/\1/p
 [ -z "$session" ] && session="default"
 file="$dir/$session"
 
+# Ended sessions are kept in .ended/ for a day, so a background copy that starts right after the
+# conversation it continues has ended can still take over its label (see below)
+ended="$dir/.ended"
+
 if [ "$state" = "end" ]; then
-  rm -f "$file"
+  if [ -f "$file" ]; then
+    mkdir -p "$ended"
+    mv -f "$file" "$ended/" 2>/dev/null || rm -f "$file"
+  fi
+  find "$ended" -type f -mtime +0 -delete 2>/dev/null
   exit 0
 fi
 
@@ -102,6 +110,25 @@ if [ -z "$label" ]; then
         rm -f "$f"
       fi
     done
+  fi
+
+  # Opening a terminal's own conversation from agent view (or /resume) continues it as a background
+  # copy with a new session id. The terminal's claude process then gets "parkedJobId" = the copy's
+  # short id in ~/.claude/sessions/<pid>.json. Take over the label of that terminal's dot.
+  if [ -z "$label" ]; then
+    parked=$(grep -l "\"parkedJobId\" *: *\"${session:0:8}\"" "$HOME/.claude/sessions/"*.json 2>/dev/null | head -n1)
+    parkedpid="${parked##*/}"
+    parkedpid="${parkedpid%.json}"
+    if [ -n "$parkedpid" ]; then
+      for f in "$dir"/* "$ended"/*; do
+        [ -f "$f" ] && [ "$f" != "$file" ] || continue
+        case "$f" in *.tmp) continue ;; esac
+        if [ "$(sed -n '7p' "$f")" = "$parkedpid" ]; then
+          [ -z "$label" ] && label=$(sed -n '3p' "$f")
+          rm -f "$f"
+        fi
+      done
+    fi
   fi
 
   if [ -z "$label" ]; then
