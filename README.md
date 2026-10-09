@@ -52,82 +52,83 @@ dot belongs to which terminal:
 
 ## Installation
 
-The examples below assume the repository is cloned to `C:\Projekt\claude-traffic-light`.
-Adjust the paths if you put it somewhere else.
-
-### 1. Clone the repository
+Clone the repository wherever you like to keep it, then run the installer from that folder:
 
 ```powershell
-git clone https://github.com/woltrananton/claude-traffic-light.git C:\Projekt\claude-traffic-light
+git clone https://github.com/woltrananton/claude-traffic-light.git
+cd claude-traffic-light
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-### 2. Add the hooks and status line to Claude Code
+The installer:
 
-Add the following to `~/.claude/settings.json` (`C:\Users\<you>\.claude\settings.json`), merging it
-with any settings you already have:
+1. **Adds the hooks and status line** to `~/.claude/settings.json`, pointing at the folder you cloned
+   to. Your other settings and hooks are left alone, and the previous file is saved as
+   `settings.json.bak-trafficlight`. If you already have a status line, it's kept and you get a
+   warning; run again with `-ReplaceStatusLine` to use the traffic light's instead.
+2. **Creates a shortcut in your Startup folder**, so the tray app starts when you log in.
+3. **Starts the tray app.**
+4. **Builds and installs the VS Code extension**, if VS Code and Node.js are installed. Reload open
+   VS Code windows once afterwards (Ctrl+Shift+P → **Developer: Reload Window**). The extension is
+   what lets a click switch to the right VS Code window and terminal tab; without it, a click still
+   brings up a window, but VS Code runs all of its windows in a single process, so it can't tell
+   which window or tab a session belongs to.
+
+It's safe to run the installer again, for example after moving the folder: it replaces its own
+entries instead of adding new ones.
+
+| Option | Effect |
+|---|---|
+| `-SkipExtension` | Don't build or install the VS Code extension |
+| `-NoStart` | Don't start the tray app now |
+| `-ReplaceStatusLine` | Replace an existing status line with the traffic light's |
+
+`bash` must be Git Bash. If `bash` on your `PATH` is missing or is WSL's, the installer uses Git
+Bash's full path instead.
+
+### Manual installation
+
+If you'd rather set it up by hand, add the following to `~/.claude/settings.json`, merging it with
+any settings you already have, and replace `C:/path/to/claude-traffic-light` with where you cloned
+the repository:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "bash \"C:/Projekt/claude-traffic-light/statusline.sh\"",
+    "command": "bash \"C:/path/to/claude-traffic-light/statusline.sh\"",
     "refreshInterval": 2
   },
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "bash \"C:/Projekt/claude-traffic-light/hook.sh\" start", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" start", "timeout": 10 }] }
     ],
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "bash \"C:/Projekt/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
     ],
     "PreToolUse": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"C:/Projekt/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
     ],
     "Notification": [
-      { "hooks": [{ "type": "command", "command": "bash \"C:/Projekt/claude-traffic-light/hook.sh\" red", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" red", "timeout": 10 }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "bash \"C:/Projekt/claude-traffic-light/hook.sh\" green", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" green", "timeout": 10 }] }
     ],
     "SessionEnd": [
-      { "hooks": [{ "type": "command", "command": "bash \"C:/Projekt/claude-traffic-light/hook.sh\" end", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" end", "timeout": 10 }] }
     ]
   }
 }
 ```
 
-`bash` must be Git Bash. If `bash` on your `PATH` resolves to something else (for example WSL),
-use the full path instead, e.g. `"C:/Program Files/Git/bin/bash.exe"`.
-
-### 3. Start the tray app
-
-Double-click `start-trafficlight.vbs`. It starts `trafficlight.ps1` without showing a PowerShell window.
-
-To start it automatically at login, put a shortcut in your Startup folder:
+Then double-click `start-trafficlight.vbs` to start the tray app (put a shortcut to it in
+`shell:startup` to start it at login), and build the extension from the `vscode-extension` folder:
 
 ```powershell
-$startup = [Environment]::GetFolderPath('Startup')
-$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$startup\Claude Traffic Light.lnk")
-$shortcut.TargetPath = 'C:\WINDOWS\system32\wscript.exe'
-$shortcut.Arguments = '"C:\Projekt\claude-traffic-light\start-trafficlight.vbs"'
-$shortcut.Save()
-```
-
-Only one instance runs at a time, so starting it twice is harmless.
-
-### 4. (Optional) Install the VS Code extension
-
-The extension is what lets a click switch to the right VS Code window and terminal tab.
-Without it, a click still brings up a window, but VS Code runs all of its windows in a single
-process, so it can't tell which window or tab a session belongs to.
-
-```powershell
-cd C:\Projekt\claude-traffic-light\vscode-extension
 npx @vscode/vsce package --skip-license -o claude-traffic-light-focus.vsix
 code --install-extension claude-traffic-light-focus.vsix --force
 ```
-
-Then reload every open VS Code window once (Ctrl+Shift+P → **Developer: Reload Window**).
 
 ## Usage
 
@@ -163,6 +164,7 @@ Claude Code ──hooks──▶ hook.sh ──writes──▶ ~/.claude/traffic
 | `find-window.ps1` | Called once per session by `hook.sh`. Walks up the process tree to find the session's window and terminal. |
 | `trafficlight.ps1` | The tray app. Polls the state files every second and draws, updates and removes dots. Handles clicks and menus. |
 | `start-trafficlight.vbs` | Starts the tray app without a visible console window. |
+| `install.ps1` | Installs or (with `-Uninstall`) removes everything above for the current user. |
 | `statusline.sh` | Claude Code status line showing the session's label, project and status. |
 | `vscode-extension/` | VS Code extension that maps terminals to windows and switches to the right terminal tab. |
 
@@ -173,7 +175,7 @@ Claude Code ──hooks──▶ hook.sh ──writes──▶ ~/.claude/traffic
 | Line | Content | Example |
 |---|---|---|
 | 1 | Status: `yellow`, `red` or `green` | `yellow` |
-| 2 | Project folder (cwd) | `C:\Projekt\claude-traffic-light` |
+| 2 | Project folder (cwd) | `C:\code\claude-traffic-light` |
 | 3 | Label shown on the dot and in the status line | `C1` |
 | 4 | Window handle (HWND) of the terminal / VS Code window, `0` if none was found | `4331566` |
 | 5 | PID of the VS Code terminal's shell, `0` outside VS Code | `15292` |
@@ -275,12 +277,16 @@ Dots that haven't been updated for 12 hours are removed automatically.
 
 ## Uninstall
 
-1. Right-click a dot → **Quit traffic light (all dots)**.
-2. Delete the Startup shortcut (`shell:startup` → `Claude Traffic Light.lnk`).
-3. Remove the `statusLine` and `hooks` entries from `~/.claude/settings.json`.
-4. Uninstall the extension: `code --uninstall-extension woltrananton.claude-traffic-light-focus`.
-5. Delete `~/.claude/trafficlight/`, `~/.claude/trafficlight-windows/`, `~/.claude/trafficlight-focus`
-   and `~/.claude/trafficlight-agents.json` (plus `.err`).
+From the repository folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+```
+
+This stops the tray app, removes the traffic light's hooks and status line from
+`~/.claude/settings.json` (your other settings are kept, and a backup is saved), removes the Startup
+shortcut, uninstalls the VS Code extension and deletes the session files in `~/.claude/`. Then you
+can delete the folder.
 
 ## License
 
