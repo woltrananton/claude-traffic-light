@@ -24,12 +24,15 @@ Remove-TypeData System.Array -ErrorAction SilentlyContinue
 $root = $PSScriptRoot
 $rootSlash = $root -replace '\\', '/'
 $events = [ordered]@{
-    SessionStart     = 'start'
-    UserPromptSubmit = 'yellow'
-    PreToolUse       = 'yellow'
-    Notification     = 'red'
-    Stop             = 'green'
-    SessionEnd       = 'end'
+    SessionStart       = 'start'
+    UserPromptSubmit   = 'yellow'
+    PreToolUse         = 'yellow'
+    # After a tool finishes - e.g. one you just approved - Claude is working again
+    PostToolUse        = 'yellow'
+    PostToolUseFailure = 'yellow'
+    Notification       = 'red'
+    Stop               = 'green'
+    SessionEnd         = 'end'
 }
 # Recognizes the traffic light's hooks and status line wherever the folder was, so a reinstall
 # after moving it replaces the old entries instead of adding new ones
@@ -152,7 +155,7 @@ function Install-Settings {
     if (-not $settings.PSObject.Properties['hooks']) { Set-Property $settings 'hooks' (New-Object psobject) }
     foreach ($event in $events.Keys) {
         $group = [ordered]@{}
-        if ($event -eq 'PreToolUse') { $group.matcher = '*' }
+        if ($event -like '*ToolUse*') { $group.matcher = '*' }
         $group.hooks = @([ordered]@{ type = 'command'; command = "$bash `"$rootSlash/hook.sh`" $($events[$event])"; timeout = 10 })
         $existing = if ($settings.hooks.PSObject.Properties[$event]) { @($settings.hooks.$event) } else { @() }
         Set-Property $settings.hooks $event (@($existing) + [pscustomobject]$group)

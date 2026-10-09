@@ -115,6 +115,12 @@ the repository:
     "PreToolUse": [
       { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
     ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" yellow", "timeout": 10 }] }
+    ],
     "Notification": [
       { "hooks": [{ "type": "command", "command": "bash \"C:/path/to/claude-traffic-light/hook.sh\" red", "timeout": 10 }] }
     ],
@@ -213,6 +219,7 @@ Files are written atomically (write to `.tmp`, then rename), so the tray app nev
 |---|---|
 | `SessionStart` | Keeps the existing status, or green for a new session |
 | `UserPromptSubmit`, `PreToolUse` | Yellow |
+| `PostToolUse`, `PostToolUseFailure` | Yellow — so a dot that went red for a permission prompt turns yellow again once the approved tool has run |
 | `Notification` | Red — except idle notifications ("Claude is waiting for your input"), which keep the current status |
 | `Stop` | Green |
 | `SessionEnd` | The state file is moved to `~/.claude/trafficlight/.ended/` (kept for a day) and the dot disappears |
