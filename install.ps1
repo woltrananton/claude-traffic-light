@@ -240,7 +240,16 @@ if ($Uninstall) {
 Install-Settings
 Install-Shortcut
 if (-not $NoStart) {
-    Write-Step 'Starting the tray app'
+    # A running tray app keeps running the old code (and blocks a second instance), so restart it
+    # to pick up an update. The session files are kept, so the dots come back as they were.
+    $tray = @(Get-TrayProcesses)
+    if ($tray.Count) {
+        Write-Step 'Restarting the tray app'
+        $tray | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        $tray | ForEach-Object { Wait-Process -Id $_.ProcessId -Timeout 10 -ErrorAction SilentlyContinue }
+    } else {
+        Write-Step 'Starting the tray app'
+    }
     & (Join-Path $env:SystemRoot 'System32\wscript.exe') (Join-Path $root 'start-trafficlight.vbs')
 }
 Install-Extension

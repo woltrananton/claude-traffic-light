@@ -130,6 +130,22 @@ npx @vscode/vsce package --skip-license -o claude-traffic-light-focus.vsix
 code --install-extension claude-traffic-light-focus.vsix --force
 ```
 
+## Updating
+
+From the repository folder:
+
+```powershell
+git pull
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The installer updates the settings, restarts the tray app so it runs the new version, and rebuilds
+the VS Code extension. Your dots and their labels are kept. Reload open VS Code windows once
+afterwards. If you downloaded a ZIP instead of cloning, download the new version, replace the
+folder's contents and run the installer.
+
+See [Releases](https://github.com/woltrananton/claude-traffic-light/releases) for what changed.
+
 ## Usage
 
 Just use Claude Code as normal. A dot appears as soon as a session starts or you send the first
