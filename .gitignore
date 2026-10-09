@@ -1,0 +1,2 @@
+# Built VS Code extension package (build it with vsce, see README)
+*.vsix
